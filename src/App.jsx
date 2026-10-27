@@ -19,6 +19,11 @@ function App() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [adminStudents, setAdminStudents] = useState([])
+  const [adminLoading, setAdminLoading] = useState(false)
+  const [adminError, setAdminError] = useState('')
+
   useEffect(() => {
     let active = true
 
@@ -56,6 +61,56 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    let active = true
+
+    async function checkAdmin() {
+      if (!user) {
+        setIsAdmin(false)
+        setAdminStudents([])
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!active) return
+
+      if (error) {
+        console.error('Admin check failed:', error.message)
+        setIsAdmin(false)
+        return
+      }
+
+      setIsAdmin(Boolean(data))
+    }
+
+    checkAdmin()
+
+    return () => {
+      active = false
+    }
+  }, [user])
+
+  async function loadAdminStudents() {
+    setAdminLoading(true)
+    setAdminError('')
+
+    const { data, error } = await supabase.rpc('get_admin_students')
+
+    if (error) {
+      setAdminError(error.message)
+      setAdminStudents([])
+    } else {
+      setAdminStudents(data || [])
+    }
+
+    setAdminLoading(false)
+  }
+
   function openPage(nextPage) {
     setAuthError('')
     setAuthMessage('')
@@ -69,11 +124,20 @@ function App() {
       return
     }
 
-    setDashboardSection(section)
-    setPage('dashboard')
+    if (section === 'admin' && !isAdmin) {
+      setAuthError('You do not have permission to access the admin dashboard.')
+      return
+    }
+
     setAuthError('')
     setAuthMessage('')
+    setDashboardSection(section)
+    setPage('dashboard')
     window.scrollTo({ top: 0, behavior: 'smooth' })
+
+    if (section === 'admin') {
+      loadAdminStudents()
+    }
   }
 
   async function handleAuth(event) {
@@ -145,6 +209,8 @@ function App() {
     }
 
     setUser(null)
+    setIsAdmin(false)
+    setAdminStudents([])
     setPage('about')
     setDashboardSection('home')
     setEmail('')
@@ -175,7 +241,14 @@ function App() {
     )
   }
 
-  function FeatureCard({ icon, iconClass, title, description, buttonText, onClick }) {
+  function FeatureCard({
+    icon,
+    iconClass,
+    title,
+    description,
+    buttonText,
+    onClick,
+  }) {
     return (
       <article className="feature-card">
         <div className={`feature-icon ${iconClass}`}>{icon}</div>
@@ -196,7 +269,6 @@ function App() {
     )
   }
 
-  // Public About page
   if (page === 'about' || (page === 'dashboard' && !user)) {
     return (
       <div className="app">
@@ -227,13 +299,11 @@ function App() {
             <span className="eyebrow">
               BUILT FOR BOWEN UNIVERSITY COCS STUDENTS
             </span>
-
             <h1>
               Your studies.
               <br />
               <span>Made simpler.</span>
             </h1>
-
             <p>
               Find course materials, lecture PDFs, assignments and learning
               tools in one place.
@@ -272,21 +342,19 @@ function App() {
                 buttonText="Explore materials"
                 onClick={() => openPage('signup')}
               />
-
               <FeatureCard
                 icon="✳"
                 iconClass="quiz"
                 title="AI Quiz Generator"
-                description="Practise what you learn with revision questions generated from your course materials."
+                description="Practise with revision questions from your course materials."
                 buttonText="Get started"
                 onClick={() => openPage('signup')}
               />
-
               <FeatureCard
                 icon="▤"
                 iconClass="library"
                 title="Assignments"
-                description="Find course assignments and access available PDF resources."
+                description="Find course assignments and available PDF resources."
                 buttonText="Explore assignments"
                 onClick={() => openPage('signup')}
               />
@@ -315,7 +383,6 @@ function App() {
     )
   }
 
-  // Login and signup
   if (page === 'signup' || page === 'login') {
     const isSignup = page === 'signup'
 
@@ -382,15 +449,10 @@ function App() {
           />
 
           {authError && (
-            <p className="auth-error" role="alert">
-              {authError}
-            </p>
+            <p className="auth-error" role="alert">{authError}</p>
           )}
-
           {authMessage && (
-            <p className="auth-message" role="status">
-              {authMessage}
-            </p>
+            <p className="auth-message" role="status">{authMessage}</p>
           )}
 
           <button
@@ -430,7 +492,6 @@ function App() {
     )
   }
 
-  // Dashboard: accessible only to logged-in users
   if (page === 'dashboard' && user) {
     return (
       <div className="app">
@@ -458,7 +519,6 @@ function App() {
           >
             Overview
           </button>
-
           <button
             type="button"
             className={dashboardSection === 'materials' ? 'active' : ''}
@@ -466,7 +526,6 @@ function App() {
           >
             Course Materials
           </button>
-
           <button
             type="button"
             className={dashboardSection === 'assignments' ? 'active' : ''}
@@ -474,7 +533,6 @@ function App() {
           >
             Assignments
           </button>
-
           <button
             type="button"
             className={dashboardSection === 'quiz' ? 'active' : ''}
@@ -482,19 +540,77 @@ function App() {
           >
             AI Quiz Generator
           </button>
+
+          {isAdmin && (
+            <button
+              type="button"
+              className={dashboardSection === 'admin' ? 'active' : ''}
+              onClick={() => openDashboardSection('admin')}
+            >
+              Admin Dashboard
+            </button>
+          )}
         </nav>
 
         {dashboardSection === 'materials' ? (
-          <main>
-            <CourseMaterial user={user} />
-          </main>
+          <main><CourseMaterial user={user} /></main>
         ) : dashboardSection === 'assignments' ? (
-          <main>
-            <Assignments user={user} />
-          </main>
+          <main><Assignments user={user} /></main>
         ) : dashboardSection === 'quiz' ? (
-          <main>
-            <AIQuizGenerator />
+          <main><AIQuizGenerator /></main>
+        ) : dashboardSection === 'admin' && isAdmin ? (
+          <main className="features">
+            <div className="section-heading">
+              <div>
+                <span className="eyebrow">ADMINISTRATION</span>
+                <h2>Registered students</h2>
+              </div>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={loadAdminStudents}
+                disabled={adminLoading}
+              >
+                {adminLoading ? 'Loading...' : 'Refresh list'}
+              </button>
+            </div>
+
+            {adminError && (
+              <p className="auth-error" role="alert">{adminError}</p>
+            )}
+
+            {adminLoading ? (
+              <p>Loading student records...</p>
+            ) : adminStudents.length === 0 ? (
+              <p>No student profiles were returned.</p>
+            ) : (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Full name</th>
+                      <th>Email</th>
+                      <th>Department</th>
+                      <th>Registered</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminStudents.map((student) => (
+                      <tr key={student.id}>
+                        <td>{student.full_name || 'Not provided'}</td>
+                        <td>{student.email || 'Not provided'}</td>
+                        <td>{student.department || 'Not provided'}</td>
+                        <td>
+                          {student.created_at
+                            ? new Date(student.created_at).toLocaleDateString()
+                            : 'Unknown'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </main>
         ) : (
           <main>
@@ -522,7 +638,6 @@ function App() {
                 >
                   Open Course Materials →
                 </button>
-
                 <button
                   type="button"
                   className="secondary-btn"
@@ -530,7 +645,6 @@ function App() {
                 >
                   View Assignments →
                 </button>
-
                 <button
                   type="button"
                   className="primary-btn"
@@ -558,7 +672,6 @@ function App() {
                   buttonText="Explore materials"
                   onClick={() => openDashboardSection('materials')}
                 />
-
                 <FeatureCard
                   icon="✳"
                   iconClass="quiz"
@@ -567,12 +680,11 @@ function App() {
                   buttonText="Create a quiz"
                   onClick={() => openDashboardSection('quiz')}
                 />
-
                 <FeatureCard
                   icon="▤"
                   iconClass="library"
                   title="Assignments"
-                  description="Open assignments and access available PDF resources."
+                  description="Open assignments and available PDF resources."
                   buttonText="View assignments"
                   onClick={() => openDashboardSection('assignments')}
                 />
