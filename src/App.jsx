@@ -1,707 +1,1099 @@
+import React, { useEffect, useState } from "react";
+import { supabase }from "./supabaseClient";
+import CourseMaterial from "./CourseMaterial";
 
-import { useEffect, useState } from 'react'
-import { supabase } from './supabaseClient'
-import CourseMaterial from './CourseMaterial'
-import Assignments from './Assignments'
-import AIQuizGenerator from './AIQuizGenerator'
-import './App.css'
+const departments = [
+  "COCS",
+  "SOFTWARE ENGINEERING",
+  "COMPUTER SCIENCE",
+  "CYBERSECURITY",
+  "INFORMATION TECHNOLOGY",
+];
 
 function App() {
-  const [page, setPage] = useState('about')
-  const [dashboardSection, setDashboardSection] = useState('home')
-  const [user, setUser] = useState(null)
-  const [authLoading, setAuthLoading] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [authError, setAuthError] = useState('')
-  const [authMessage, setAuthMessage] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [department, setDepartment] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [page, setPage] = useState("about");
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [adminStudents, setAdminStudents] = useState([])
-  const [adminLoading, setAdminLoading] = useState(false)
-  const [adminError, setAdminError] = useState('')
+  const [fullName, setFullName] = useState("");
+  const [department, setDepartment] = useState(departments[0]);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
+  const [authError, setAuthError] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+
+  // Check the user's login session
   useEffect(() => {
-    let active = true
+    let mounted = true;
 
-    async function loadSession() {
-      const { data, error } = await supabase.auth.getSession()
+    const getInitialSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
 
-      if (!active) return
+      if (!mounted) return;
 
-      if (error) setAuthError(error.message)
+      if (error) {
+        setAuthError(error.message);
+      }
 
-      const currentUser = data?.session?.user ?? null
-      setUser(currentUser)
-      setPage(currentUser ? 'dashboard' : 'about')
-      setDashboardSection('home')
-      setAuthLoading(false)
-    }
+      setUser(data?.session?.user ?? null);
+      setAuthLoading(false);
+    };
 
-    loadSession()
+    getInitialSession();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active) return
-
-      const currentUser = session?.user ?? null
-      setUser(currentUser)
-      setPage(currentUser ? 'dashboard' : 'about')
-      setDashboardSection('home')
-      setAuthLoading(false)
-    })
+      if (mounted) {
+        setUser(session?.user ?? null);
+      }
+    });
 
     return () => {
-      active = false
-      subscription.unsubscribe()
-    }
-  }, [])
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
-  useEffect(() => {
-    let active = true
+  // Navigation
+  const openPage = (selectedPage) => {
+    setAuthError("");
+    setAuthMessage("");
+    setPassword("");
+    setPage(selectedPage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-    async function checkAdmin() {
-      if (!user) {
-        setIsAdmin(false)
-        setAdminStudents([])
-        return
-      }
+  // Sign up
+  const handleSignup = async (event) => {
+    event.preventDefault();
 
-      const { data, error } = await supabase
-        .from('admin_users')
-        .select('user_id')
-        .eq('user_id', user.id)
-        .maybeSingle()
+    setAuthError("");
+    setAuthMessage("");
 
-      if (!active) return
-
-      if (error) {
-        console.error('Admin check failed:', error.message)
-        setIsAdmin(false)
-        return
-      }
-
-      setIsAdmin(Boolean(data))
+    if (!fullName.trim() || !email.trim() || !password) {
+      setAuthError("Please complete all the fields.");
+      return;
     }
 
-    checkAdmin()
-
-    return () => {
-      active = false
+    if (password.length < 6) {
+      setAuthError("Your password must contain at least 6 characters.");
+      return;
     }
-  }, [user])
 
-  async function loadAdminStudents() {
-    setAdminLoading(true)
-    setAdminError('')
+    setIsSubmitting(true);
 
-    const { data, error } = await supabase.rpc('get_admin_students')
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: {
+          full_name: fullName.trim(),
+          department,
+        },
+      },
+    });
+
+    setIsSubmitting(false);
 
     if (error) {
-      setAdminError(error.message)
-      setAdminStudents([])
+      setAuthError(error.message);
+      return;
+    }
+
+    if (data.session) {
+      setUser(data.user);
+      setPage("dashboard");
     } else {
-      setAdminStudents(data || [])
+      setAuthMessage(
+        "Your account has been created. Please check your email to confirm your account before logging in."
+      );
     }
+  };
 
-    setAdminLoading(false)
-  }
+  // Log in
+  const handleLogin = async (event) => {
+    event.preventDefault();
 
-  function openPage(nextPage) {
-    setAuthError('')
-    setAuthMessage('')
-    setPage(nextPage)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+    setAuthError("");
+    setAuthMessage("");
+    setIsSubmitting(true);
 
-  function openDashboardSection(section) {
-    if (!user) {
-      openPage('login')
-      return
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
 
-    if (section === 'admin' && !isAdmin) {
-      setAuthError('You do not have permission to access the admin dashboard.')
-      return
-    }
-
-    setAuthError('')
-    setAuthMessage('')
-    setDashboardSection(section)
-    setPage('dashboard')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-
-    if (section === 'admin') {
-      loadAdminStudents()
-    }
-  }
-
-  async function handleAuth(event) {
-    event.preventDefault()
-    setAuthError('')
-    setAuthMessage('')
-    setIsSubmitting(true)
-
-    try {
-      if (page === 'signup') {
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: {
-              full_name: fullName.trim(),
-              department,
-            },
-          },
-        })
-
-        if (error) throw error
-
-        setPassword('')
-
-        if (data.session && data.user) {
-          setUser(data.user)
-          setPage('dashboard')
-          setDashboardSection('home')
-          setFullName('')
-          setDepartment('')
-          setEmail('')
-        } else {
-          setAuthMessage(
-            'Account created! Check your email for a confirmation link, then log in.'
-          )
-          setPage('login')
-        }
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        })
-
-        if (error) throw error
-
-        setUser(data.user)
-        setPage('dashboard')
-        setDashboardSection('home')
-        setPassword('')
-      }
-
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    } catch (error) {
-      setAuthError(error?.message || 'Something went wrong. Please try again.')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  async function logout() {
-    setAuthError('')
-
-    const { error } = await supabase.auth.signOut()
+    setIsSubmitting(false);
 
     if (error) {
-      setAuthError(error.message)
-      return
+      setAuthError(error.message);
+      return;
     }
 
-    setUser(null)
-    setIsAdmin(false)
-    setAdminStudents([])
-    setPage('about')
-    setDashboardSection('home')
-    setEmail('')
-    setPassword('')
-    setAuthMessage('')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+    setUser(data.user);
+    setPage("dashboard");
+  };
 
-  function Logo() {
-    return (
-      <button
-        className="logo"
-        type="button"
-        onClick={() => {
-          if (user) {
-            openDashboardSection('home')
-          } else {
-            openPage('about')
-          }
-        }}
-        aria-label="Bowen Study Hub home"
-      >
-        <span className="logo-icon">
-          <img src="/bulogo.jpg" alt="" />
-        </span>
-        <span>Bowen Study Hub</span>
-      </button>
-    )
-  }
+  // Log out
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
 
-  function FeatureCard({
-    icon,
-    iconClass,
-    title,
-    description,
-    buttonText,
-    onClick,
-  }) {
-    return (
-      <article className="feature-card">
-        <div className={`feature-icon ${iconClass}`}>{icon}</div>
-        <h3>{title}</h3>
-        <p>{description}</p>
-        <button className="text-link" type="button" onClick={onClick}>
-          {buttonText} ↗
-        </button>
-      </article>
-    )
-  }
+    if (error) {
+      setAuthError(error.message);
+      return;
+    }
 
+    setUser(null);
+    setPage("about");
+    setEmail("");
+    setPassword("");
+  };
+
+  // Loading screen
   if (authLoading) {
     return (
-      <div className="auth-page" role="status">
+      <div className="loading-screen">
+        <div className="loading-spinner"></div>
         <p>Loading Bowen Study Hub...</p>
       </div>
-    )
+    );
   }
 
-  if (page === 'about' || (page === 'dashboard' && !user)) {
-    return (
-      <div className="app">
-        <header className="navbar">
-          <Logo />
-          <nav>
-            <a href="#about">About</a>
-            <a href="#features">Features</a>
-            <button
-              type="button"
-              className="login-btn"
-              onClick={() => openPage('login')}
-            >
-              Log in
-            </button>
-            <button
-              type="button"
-              className="primary-btn"
-              onClick={() => openPage('signup')}
-            >
-              Get started
-            </button>
-          </nav>
-        </header>
+  // Reusable public pages
+  const publicPages = {
+    about: {
+      title: "About Bowen Study Hub",
+      content: (
+        <>
+          <p>
+            Bowen Study Hub is an independent learning platform created to
+            help students organise their academic resources and make studying
+            easier.
+          </p>
 
+          <h3>Our Mission</h3>
+          <p>
+            Our mission is to make academic resources easier to find, organise
+            and use. We aim to support students with accessible learning
+            materials and useful study tools.
+          </p>
+
+          <h3>What We Offer</h3>
+          <ul>
+            <li>Organised course materials.</li>
+            <li>Access to educational PDF resources.</li>
+            <li>Study tools and learning support.</li>
+            <li>A platform for students to support one another academically.</li>
+          </ul>
+
+          <p>
+            Bowen Study Hub is an independent student project. It is not an
+            official website of Bowen University and is not affiliated with
+            or endorsed by the University.
+          </p>
+        </>
+      ),
+    },
+
+    privacy: {
+      title: "Privacy Policy",
+      content: (
+        <>
+          <p>
+            This Privacy Policy explains how Bowen Study Hub handles
+            information when visitors use the website.
+          </p>
+
+          <h3>1. Information We Collect</h3>
+          <p>
+            When you create an account, we may collect information such as
+            your name, email address and selected department.
+          </p>
+
+          <h3>2. How We Use Information</h3>
+          <p>
+            Account information is used to create and manage accounts,
+            provide access to platform features and maintain website security.
+          </p>
+
+          <h3>3. Data Storage</h3>
+          <p>
+            The website uses Supabase services for authentication and
+            associated platform data. Information is handled according to
+            the applicable service policies and our actual website practices.
+          </p>
+
+          <h3>4. Cookies and Advertising</h3>
+          <p>
+            The website may use cookies or similar technologies for essential
+            functionality, analytics or advertising where these services are
+            enabled.
+          </p>
+
+          <p>
+            If Google AdSense is enabled, Google and its partners may use
+            cookies or similar technologies to provide and measure
+            advertisements. Visitors should be able to review Google's
+            advertising and privacy information.
+          </p>
+
+          <h3>5. Information Sharing</h3>
+          <p>
+            We do not intend to sell users' personal information. Information
+            may be processed by service providers that help operate the
+            website, subject to their applicable policies.
+          </p>
+
+          <h3>6. Data Security</h3>
+          <p>
+            We take reasonable steps to protect information. However, no
+            online service can guarantee absolute security.
+          </p>
+
+          <h3>7. Contact</h3>
+          <p>
+            For questions about this policy or personal information, please
+            use the Contact page.
+          </p>
+
+          <p>
+            Last updated: November 2026.
+          </p>
+        </>
+      ),
+    },
+
+    terms: {
+      title: "Terms of Use",
+      content: (
+        <>
+          <p>
+            By accessing Bowen Study Hub, you agree to use the website
+            responsibly and in accordance with these terms.
+          </p>
+
+          <h3>1. Acceptable Use</h3>
+          <p>
+            Users must not misuse the platform, attempt to disrupt its
+            operation or access accounts and information without permission.
+          </p>
+
+          <h3>2. User Accounts</h3>
+          <p>
+            Users are responsible for keeping their login details secure and
+            for activities carried out through their accounts.
+          </p>
+
+          <h3>3. Educational Materials</h3>
+          <p>
+            Materials must only be uploaded or shared when the uploader has
+            the necessary rights or permission to distribute them.
+          </p>
+
+          <h3>4. Copyright</h3>
+          <p>
+            Users must respect copyright and intellectual property rights.
+            Materials that are shared without permission may be removed.
+          </p>
+
+          <h3>5. Website Availability</h3>
+          <p>
+            We may update, modify or temporarily suspend parts of the website
+            when necessary.
+          </p>
+
+          <h3>6. Disclaimer</h3>
+          <p>
+            Bowen Study Hub is an independent educational project. It is not
+            an official Bowen University website.
+          </p>
+
+          <h3>7. Changes to These Terms</h3>
+          <p>
+            These terms may be updated when necessary. Continued use of the
+            website after changes means you accept the updated terms.
+          </p>
+        </>
+      ),
+    },
+
+    contact: {
+      title: "Contact Us",
+      content: (
+        <>
+          <p>
+            Have a question, suggestion or issue with Bowen Study Hub?
+            We welcome feedback that can help improve the platform.
+          </p>
+
+          <h3>What You Can Contact Us About</h3>
+          <ul>
+            <li>Problems accessing your account.</li>
+            <li>Issues with course materials.</li>
+            <li>Incorrect or outdated educational resources.</li>
+            <li>Copyright or content removal requests.</li>
+            <li>Suggestions for new features.</li>
+          </ul>
+
+          <p>
+            Reach us @<a href="mailto:mekemebassey13@gmail.com">mekemebassey13@gmail.com</a>
+          </p>
+        </>
+      ),
+    },
+  };
+
+  const isPublicPage = Object.prototype.hasOwnProperty.call(
+    publicPages,
+    page
+  );
+
+  return (
+    <div className="app">
+      <style>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        body {
+          margin: 0;
+          font-family: Arial, Helvetica, sans-serif;
+          background: #080d18;
+          color: #f5f7fb;
+        }
+
+        button, input, select {
+          font: inherit;
+        }
+
+        button {
+          cursor: pointer;
+        }
+
+        .app {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .navbar {
+          min-height: 76px;
+          padding: 14px 7%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          background: #101827;
+          border-bottom: 1px solid #263247;
+        }
+
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          cursor: pointer;
+          font-size: 20px;
+          font-weight: 800;
+          color: white;
+        }
+
+        .brand img {
+          width: 42px;
+          height: 42px;
+          object-fit: contain;
+          border-radius: 8px;
+        }
+
+        .nav-links {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          flex-wrap: wrap;
+        }
+
+        .nav-links button {
+          border: none;
+          background: transparent;
+          color: #cbd5e1;
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        .nav-links button:hover {
+          color: #ff8b3d;
+        }
+
+        .primary-button {
+          background: #f47732 !important;
+          color: white !important;
+          border: none;
+          border-radius: 8px;
+          padding: 12px 19px;
+          font-weight: 700;
+        }
+
+        .secondary-button {
+          background: #1d2a40;
+          color: white;
+          border: 1px solid #35445d;
+          border-radius: 8px;
+          padding: 11px 18px;
+        }
+
+        .hero {
+          padding: 100px 7%;
+          text-align: center;
+          background:
+            radial-gradient(circle at top, #1c2b45 0%, #080d18 65%);
+        }
+
+        .hero h1 {
+          max-width: 850px;
+          margin: 0 auto 20px;
+          font-size: clamp(38px, 6vw, 64px);
+          line-height: 1.1;
+        }
+
+        .hero h1 span {
+          color: #ff873e;
+        }
+
+        .hero p {
+          max-width: 650px;
+          margin: 0 auto 30px;
+          color: #b8c4d8;
+          font-size: 17px;
+          line-height: 1.8;
+        }
+
+        .hero-actions {
+          display: flex;
+          justify-content: center;
+          gap: 14px;
+          flex-wrap: wrap;
+        }
+
+        .section {
+          padding: 65px 7%;
+        }
+
+        .section-heading {
+          text-align: center;
+          margin-bottom: 35px;
+        }
+
+        .section-heading h2 {
+          font-size: 32px;
+          margin-bottom: 12px;
+        }
+
+        .section-heading p {
+          color: #aab7ca;
+          line-height: 1.7;
+        }
+
+        .feature-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+          gap: 20px;
+          max-width: 1050px;
+          margin: auto;
+        }
+
+        .feature-card {
+          background: #111c2d;
+          border: 1px solid #27364d;
+          border-radius: 14px;
+          padding: 27px;
+        }
+
+        .feature-card h3 {
+          color: #ff873e;
+          margin-top: 0;
+        }
+
+        .feature-card p {
+          color: #b8c4d8;
+          line-height: 1.7;
+        }
+
+        .content-area {
+          width: min(900px, 90%);
+          margin: 55px auto;
+          flex: 1;
+        }
+
+        .public-page {
+          background: #111c2d;
+          border: 1px solid #29384f;
+          border-radius: 15px;
+          padding: 35px;
+        }
+
+        .public-page h1 {
+          color: #ff873e;
+          margin-top: 0;
+        }
+
+        .public-page h3 {
+          margin-top: 28px;
+          color: #f6a16c;
+        }
+
+        .public-page p,
+        .public-page li {
+          color: #c2ccda;
+          line-height: 1.85;
+        }
+
+        .public-page ul {
+          padding-left: 22px;
+        }
+
+        .auth-container {
+          width: min(440px, 90%);
+          margin: 65px auto;
+          padding: 32px;
+          background: #111c2d;
+          border: 1px solid #29384f;
+          border-radius: 15px;
+        }
+
+        .auth-container h1 {
+          margin-top: 0;
+          text-align: center;
+        }
+
+        .auth-container > p {
+          color: #aebbd0;
+          text-align: center;
+          line-height: 1.6;
+        }
+
+        .form-group {
+          margin-bottom: 17px;
+        }
+
+        .form-group label {
+          display: block;
+          margin-bottom: 8px;
+          color: #dce4ef;
+          font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+          width: 100%;
+          padding: 13px;
+          border-radius: 8px;
+          border: 1px solid #35445d;
+          background: #0b1423;
+          color: white;
+          outline: none;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+          border-color: #f47732;
+        }
+
+        .submit-button {
+          width: 100%;
+          padding: 14px;
+          border: none;
+          border-radius: 8px;
+          background: #f47732;
+          color: white;
+          font-weight: 700;
+        }
+
+        .submit-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .form-switch {
+          margin-top: 20px;
+          text-align: center;
+          color: #b8c4d8;
+          font-size: 14px;
+        }
+
+        .form-switch button {
+          border: none;
+          background: none;
+          color: #ff873e;
+          font-weight: 700;
+        }
+
+        .message {
+          padding: 12px;
+          border-radius: 8px;
+          margin-bottom: 16px;
+          line-height: 1.5;
+          font-size: 14px;
+        }
+
+        .error-message {
+          background: #431d27;
+          color: #ffc1c1;
+        }
+
+        .success-message {
+          background: #123b2d;
+          color: #a8f0c8;
+        }
+
+        .dashboard {
+          width: min(1100px, 90%);
+          margin: 45px auto;
+          flex: 1;
+        }
+
+        .dashboard-header {
+          background: #111c2d;
+          border: 1px solid #29384f;
+          border-radius: 14px;
+          padding: 28px;
+          margin-bottom: 25px;
+        }
+
+        .dashboard-header h1 {
+          margin-top: 0;
+        }
+
+        .dashboard-header p {
+          color: #b8c4d8;
+        }
+
+        .dashboard-actions {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-top: 20px;
+        }
+
+        .loading-screen {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          gap: 15px;
+          background: #080d18;
+          color: white;
+        }
+
+        .loading-spinner {
+          width: 38px;
+          height: 38px;
+          border: 4px solid #35445d;
+          border-top-color: #f47732;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .site-footer {
+          margin-top: auto;
+          padding: 30px 7%;
+          background: #101827;
+          border-top: 1px solid #263247;
+          text-align: center;
+        }
+
+        .footer-links {
+          display: flex;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 22px;
+          margin-bottom: 17px;
+        }
+
+        .footer-links button {
+          background: none;
+          border: none;
+          color: #cbd5e1;
+          font-size: 13px;
+        }
+
+        .footer-links button:hover {
+          color: #ff873e;
+        }
+
+        .site-footer p {
+          color: #8290a5;
+          font-size: 12px;
+          line-height: 1.7;
+        }
+
+        @media (max-width: 700px) {
+          .navbar {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .nav-links {
+            gap: 14px;
+          }
+
+          .hero {
+            padding: 75px 6%;
+          }
+
+          .section {
+            padding: 45px 6%;
+          }
+
+          .public-page {
+            padding: 23px;
+          }
+
+          .auth-container {
+            padding: 24px;
+          }
+        }
+      `}</style>
+
+      {/* NAVIGATION */}
+      <header className="navbar">
+        <div className="brand" onClick={() => openPage(user ? "dashboard" : "about")}>
+          <img src="/bulogo.jpg" alt="Bowen University logo" />
+          <span>Bowen Study Hub</span>
+        </div>
+
+        <nav className="nav-links">
+          {user ? (
+            <>
+              <button onClick={() => openPage("dashboard")}>Dashboard</button>
+              <button onClick={() => openPage("materials")}>
+                Course Materials
+              </button>
+              <button onClick={() => openPage("about")}>About</button>
+              <button onClick={handleLogout}>Log out</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => openPage("about")}>About</button>
+              <button onClick={() => openPage("privacy")}>Privacy</button>
+              <button onClick={() => openPage("terms")}>Terms</button>
+              <button onClick={() => openPage("contact")}>Contact</button>
+              <button onClick={() => openPage("login")}>Log in</button>
+              <button
+                className="primary-button"
+                onClick={() => openPage("signup")}
+              >
+                Get started
+              </button>
+            </>
+          )}
+        </nav>
+      </header>
+
+      {/* PUBLIC ABOUT PAGE */}
+      {!user && page === "about" && (
         <main>
-          <section className="hero" id="about">
-            <span className="eyebrow">
-              BUILT FOR BOWEN UNIVERSITY COCS STUDENTS
-            </span>
+          <section className="hero">
             <h1>
               Your studies.
               <br />
               <span>Made simpler.</span>
             </h1>
+
             <p>
-              Find course materials, lecture PDFs, assignments and learning
-              tools in one place.
+              A learning platform designed to help Bowen University students
+              organise their academic resources, access course materials and
+              improve their study experience.
             </p>
 
-            <div className="search-box">
-              <span aria-hidden="true">⌕</span>
-              <input
-                placeholder="What would you like to study?"
-                aria-label="What would you like to study?"
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') openPage('signup')
-                }}
-              />
-              <button type="button" onClick={() => openPage('signup')}>
-                Get started
+            <div className="hero-actions">
+              <button
+                className="primary-button"
+                onClick={() => openPage("signup")}
+              >
+                Create an account
+              </button>
+
+              <button
+                className="secondary-button"
+                onClick={() => openPage("login")}
+              >
+                Log in
               </button>
             </div>
           </section>
 
-          <section className="features" id="features">
+          <section className="section">
             <div className="section-heading">
-              <div>
-                <span className="eyebrow">WHAT WE OFFER</span>
-                <h2>A better way to study</h2>
-              </div>
-              <p>Everything organised around your learning.</p>
+              <h2>Everything you need to study smarter</h2>
+              <p>
+                Useful academic resources and tools in one organised place.
+              </p>
             </div>
 
             <div className="feature-grid">
-              <FeatureCard
-                icon="PDF"
-                iconClass="pdf"
-                title="Course Materials"
-                description="Find lecture notes and course PDFs for your semester."
-                buttonText="Explore materials"
-                onClick={() => openPage('signup')}
-              />
-              <FeatureCard
-                icon="✳"
-                iconClass="quiz"
-                title="AI Quiz Generator"
-                description="Practise with revision questions from your course materials."
-                buttonText="Get started"
-                onClick={() => openPage('signup')}
-              />
-              <FeatureCard
-                icon="▤"
-                iconClass="library"
-                title="Assignments"
-                description="Find course assignments and available PDF resources."
-                buttonText="Explore assignments"
-                onClick={() => openPage('signup')}
-              />
+              <div className="feature-card">
+                <h3>📚 Course Materials</h3>
+                <p>
+                  Find organised course resources and educational PDF
+                  materials to support your learning.
+                </p>
+              </div>
+
+              <div className="feature-card">
+                <h3>🧠 AI Quiz Generator</h3>
+                <p>
+                  A planned learning feature designed to help students
+                  practise and test their understanding.
+                </p>
+              </div>
+
+              <div className="feature-card">
+                <h3>🎓 Student-focused</h3>
+                <p>
+                  A platform designed around the academic needs of students,
+                  with an emphasis on accessible learning resources.
+                </p>
+              </div>
             </div>
           </section>
 
-          <section className="materials">
-            <span className="eyebrow">YOUR NEXT CHAPTER STARTS HERE</span>
-            <h2>Make every study session count.</h2>
-            <p>Join Bowen Study Hub and organise your learning.</p>
-            <button
-              type="button"
-              className="primary-btn"
-              onClick={() => openPage('signup')}
-            >
-              Create your account →
-            </button>
-          </section>
-        </main>
-
-        <footer>
-          <Logo />
-          <p>Made for students, built for better learning.</p>
-        </footer>
-      </div>
-    )
-  }
-
-  if (page === 'signup' || page === 'login') {
-    const isSignup = page === 'signup'
-
-    return (
-      <div className="auth-page">
-        <Logo />
-
-        <form className="auth-card" onSubmit={handleAuth}>
-          <span className="eyebrow">BOWEN STUDY HUB</span>
-          <h1>{isSignup ? 'Create your account' : 'Welcome back'}</h1>
-          <p>
-            {isSignup
-              ? 'Join Bowen Study Hub and organise your learning.'
-              : 'Continue your learning journey.'}
-          </p>
-
-          {isSignup && (
-            <>
-              <label htmlFor="full-name">Full name</label>
-              <input
-                id="full-name"
-                type="text"
-                autoComplete="name"
-                value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
-                required
-              />
-
-              <label htmlFor="department">Department (COCS)</label>
-              <select
-                id="department"
-                value={department}
-                onChange={(event) => setDepartment(event.target.value)}
-                required
-              >
-                <option value="">Select your department</option>
-                <option value="Software Engineering">Software Engineering</option>
-                <option value="Computer Science">Computer Science</option>
-                <option value="Cybersecurity">Cybersecurity</option>
-                <option value="Information Technology">Information Technology</option>
-              </select>
-            </>
-          )}
-
-          <label htmlFor="email">Email address</label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            autoComplete={isSignup ? 'new-password' : 'current-password'}
-            minLength={6}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-
-          {authError && (
-            <p className="auth-error" role="alert">{authError}</p>
-          )}
-          {authMessage && (
-            <p className="auth-message" role="status">{authMessage}</p>
-          )}
-
-          <button
-            className="primary-btn"
-            type="submit"
-            disabled={isSubmitting}
-          >
-            {isSubmitting
-              ? 'Please wait...'
-              : isSignup
-                ? 'Create account'
-                : 'Log in'}
-          </button>
-
-          <p className="auth-switch">
-            {isSignup ? 'Already have an account? ' : "Don't have an account? "}
-            <button
-              type="button"
-              onClick={() => {
-                setAuthError('')
-                setAuthMessage('')
-                setPassword('')
-                setPage(isSignup ? 'login' : 'signup')
-              }}
-            >
-              {isSignup ? 'Log in' : 'Sign up'}
-            </button>
-          </p>
-
-          <p className="auth-switch">
-            <button type="button" onClick={() => openPage('about')}>
-              ← Back to About
-            </button>
-          </p>
-        </form>
-      </div>
-    )
-  }
-
-  if (page === 'dashboard' && user) {
-    return (
-      <div className="app">
-        <header className="navbar">
-          <Logo />
-          <nav>
-            <button
-              type="button"
-              className="login-btn"
-              onClick={() => openDashboardSection('home')}
-            >
-              Dashboard
-            </button>
-            <button type="button" className="login-btn" onClick={logout}>
-              Log out
-            </button>
-          </nav>
-        </header>
-
-        <nav className="dashboard-sections" aria-label="Study sections">
-          <button
-            type="button"
-            className={dashboardSection === 'home' ? 'active' : ''}
-            onClick={() => openDashboardSection('home')}
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            className={dashboardSection === 'materials' ? 'active' : ''}
-            onClick={() => openDashboardSection('materials')}
-          >
-            Course Materials
-          </button>
-          <button
-            type="button"
-            className={dashboardSection === 'assignments' ? 'active' : ''}
-            onClick={() => openDashboardSection('assignments')}
-          >
-            Assignments
-          </button>
-          <button
-            type="button"
-            className={dashboardSection === 'quiz' ? 'active' : ''}
-            onClick={() => openDashboardSection('quiz')}
-          >
-            AI Quiz Generator
-          </button>
-
-          {isAdmin && (
-            <button
-              type="button"
-              className={dashboardSection === 'admin' ? 'active' : ''}
-              onClick={() => openDashboardSection('admin')}
-            >
-              Admin Dashboard
-            </button>
-          )}
-        </nav>
-
-        {dashboardSection === 'materials' ? (
-          <main><CourseMaterial user={user} /></main>
-        ) : dashboardSection === 'assignments' ? (
-          <main><Assignments user={user} /></main>
-        ) : dashboardSection === 'quiz' ? (
-          <main><AIQuizGenerator /></main>
-        ) : dashboardSection === 'admin' && isAdmin ? (
-          <main className="features">
+          <section className="section">
             <div className="section-heading">
-              <div>
-                <span className="eyebrow">ADMINISTRATION</span>
-                <h2>Registered students</h2>
-              </div>
-              <button
-                type="button"
-                className="primary-btn"
-                onClick={loadAdminStudents}
-                disabled={adminLoading}
-              >
-                {adminLoading ? 'Loading...' : 'Refresh list'}
-              </button>
-            </div>
-
-            {adminError && (
-              <p className="auth-error" role="alert">{adminError}</p>
-            )}
-
-            {adminLoading ? (
-              <p>Loading student records...</p>
-            ) : adminStudents.length === 0 ? (
-              <p>No student profiles were returned.</p>
-            ) : (
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Full name</th>
-                      <th>Email</th>
-                      <th>Department</th>
-                      <th>Registered</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {adminStudents.map((student) => (
-                      <tr key={student.id}>
-                        <td>{student.full_name || 'Not provided'}</td>
-                        <td>{student.email || 'Not provided'}</td>
-                        <td>{student.department || 'Not provided'}</td>
-                        <td>
-                          {student.created_at
-                            ? new Date(student.created_at).toLocaleDateString()
-                            : 'Unknown'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </main>
-        ) : (
-          <main>
-            <section className="hero dashboard-home">
-              <span className="eyebrow">YOUR CAMPUS. YOUR KNOWLEDGE.</span>
-              <h1>
-                Study smarter.
-                <br />
-                <span>Achieve more.</span>
-              </h1>
+              <h2>Start learning with Bowen Study Hub</h2>
               <p>
-                Welcome to your study space. Find course PDFs and organise
-                your learning in one place.
+                Create an account to access the student area and available
+                course resources.
               </p>
 
-              {user?.email && (
-                <p className="hero-note">Signed in as {user.email}</p>
-              )}
+              <button
+                className="primary-button"
+                onClick={() => openPage("signup")}
+              >
+                Join Bowen Study Hub
+              </button>
+            </div>
+          </section>
+        </main>
+      )}
 
-              <div className="dashboard-actions">
-                <button
-                  type="button"
-                  className="primary-btn"
-                  onClick={() => openDashboardSection('materials')}
-                >
-                  Open Course Materials →
-                </button>
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={() => openDashboardSection('assignments')}
-                >
-                  View Assignments →
-                </button>
-                <button
-                  type="button"
-                  className="primary-btn"
-                  onClick={() => openDashboardSection('quiz')}
-                >
-                  Generate an AI Quiz →
-                </button>
-              </div>
-            </section>
+      {/* PUBLIC INFORMATION PAGES */}
+      {!user && isPublicPage && page !== "about" && (
+        <main className="content-area">
+          <article className="public-page">
+            <h1>{publicPages[page].title}</h1>
+            {publicPages[page].content}
+          </article>
+        </main>
+      )}
 
-            <section className="features">
-              <div className="section-heading">
-                <div>
-                  <span className="eyebrow">YOUR LEARNING TOOLKIT</span>
-                  <h2>Everything you need to study</h2>
-                </div>
-              </div>
+      {/* SIGN UP PAGE */}
+      {!user && page === "signup" && (
+        <main className="auth-container">
+          <h1>Create your account</h1>
+          <p>Join Bowen Study Hub and access your student dashboard.</p>
 
-              <div className="feature-grid">
-                <FeatureCard
-                  icon="PDF"
-                  iconClass="pdf"
-                  title="Course Materials"
-                  description="Browse course notes and open lecture PDFs."
-                  buttonText="Explore materials"
-                  onClick={() => openDashboardSection('materials')}
-                />
-                <FeatureCard
-                  icon="✳"
-                  iconClass="quiz"
-                  title="AI Quiz Generator"
-                  description="Generate multiple-choice practice questions from your course PDFs."
-                  buttonText="Create a quiz"
-                  onClick={() => openDashboardSection('quiz')}
-                />
-                <FeatureCard
-                  icon="▤"
-                  iconClass="library"
-                  title="Assignments"
-                  description="Open assignments and available PDF resources."
-                  buttonText="View assignments"
-                  onClick={() => openDashboardSection('assignments')}
-                />
-              </div>
-            </section>
-          </main>
-        )}
+          {authError && (
+            <div className="message error-message">{authError}</div>
+          )}
 
-        <footer>
-          <Logo />
-          <p>Made for students, built for better learning.</p>
-        </footer>
-      </div>
-    )
-  }
+          {authMessage && (
+            <div className="message success-message">{authMessage}</div>
+          )}
 
-  return null
+          <form onSubmit={handleSignup}>
+            <div className="form-group">
+              <label>Full name</label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Enter your full name"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Department</label>
+              <select
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+              >
+                {departments.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Email address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Create a password"
+                minLength="6"
+                required
+              />
+            </div>
+
+            <button className="submit-button" disabled={isSubmitting}>
+              {isSubmitting ? "Creating account..." : "Create account"}
+            </button>
+          </form>
+
+          <div className="form-switch">
+            Already have an account?{" "}
+            <button onClick={() => openPage("login")}>Log in</button>
+          </div>
+        </main>
+      )}
+
+      {/* LOGIN PAGE */}
+      {!user && page === "login" && (
+        <main className="auth-container">
+          <h1>Welcome back</h1>
+          <p>Log in to continue to Bowen Study Hub.</p>
+
+          {authError && (
+            <div className="message error-message">{authError}</div>
+          )}
+
+          {authMessage && (
+            <div className="message success-message">{authMessage}</div>
+          )}
+
+          <form onSubmit={handleLogin}>
+            <div className="form-group">
+              <label>Email address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+              />
+            </div>
+
+            <button className="submit-button" disabled={isSubmitting}>
+              {isSubmitting ? "Logging in..." : "Log in"}
+            </button>
+          </form>
+
+          <div className="form-switch">
+            Don't have an account?{" "}
+            <button onClick={() => openPage("signup")}>Sign up</button>
+          </div>
+        </main>
+      )}
+
+      {/* PROTECTED DASHBOARD */}
+      {user && page === "dashboard" && (
+        <main className="dashboard">
+          <section className="dashboard-header">
+            <h1>
+              Welcome,{" "}
+              {user.user_metadata?.full_name ||
+                user.email?.split("@")[0] ||
+                "Student"}
+              !
+            </h1>
+
+            <p>
+              Your Bowen Study Hub dashboard is ready. Choose a section to
+              continue.
+            </p>
+
+            <div className="dashboard-actions">
+              <button
+                className="primary-button"
+                onClick={() => openPage("materials")}
+              >
+                Explore Course Materials
+              </button>
+
+              <button
+                className="secondary-button"
+                onClick={() => openPage("about")}
+              >
+                About the platform
+              </button>
+            </div>
+          </section>
+        </main>
+      )}
+
+      {/* PROTECTED COURSE MATERIALS */}
+      {user && page === "materials" && (
+        <main className="dashboard">
+          <div className="dashboard-header">
+            <h1>Course Materials</h1>
+            <p>
+              Browse the available academic resources for your courses.
+            </p>
+
+            <button
+              className="secondary-button"
+              onClick={() => openPage("dashboard")}
+            >
+              ← Back to Dashboard
+            </button>
+          </div>
+
+          <CourseMaterial />
+        </main>
+      )}
+
+      {/* FOOTER */}
+      <footer className="site-footer">
+        <div className="footer-links">
+          <button onClick={() => openPage("about")}>About</button>
+          <button onClick={() => openPage("privacy")}>Privacy Policy</button>
+          <button onClick={() => openPage("terms")}>Terms of Use</button>
+          <button onClick={() => openPage("contact")}>Contact</button>
+        </div>
+
+        <p>
+          © {new Date().getFullYear()} Bowen Study Hub. All rights reserved.
+        </p>
+
+        <p>
+          An independent educational project. Not an official Bowen
+          University website.
+        </p>
+      </footer>
+    </div>
+  );
 }
 
-export default App
+export default App;
