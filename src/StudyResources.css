@@ -1,0 +1,304 @@
+.study-resources {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 35px 25px 60px;
+    color: #f5f5f5;
+  }
+  
+  /* Main Heading */
+  
+  .resources-heading {
+    margin-bottom: 35px;
+  }
+  
+  .resources-label {
+    display: inline-block;
+    color: #ff9d42;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+  
+  .resources-heading h1,
+  .resource-course-header h1 {
+    font-size: 36px;
+    font-weight: 800;
+    margin: 0 0 12px;
+    color: #ffffff;
+  }
+  
+  .resources-heading > p,
+  .resource-course-header > p {
+    color: #aeb8c8;
+    font-size: 15px;
+    line-height: 1.8;
+    max-width: 750px;
+    margin: 0;
+  }
+  
+  /* Course Directory */
+  
+  .resources-course-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+  
+  .resource-course-card {
+    text-align: left;
+    background: #111d31;
+    border: 1px solid #263650;
+    border-radius: 15px;
+    padding: 25px;
+    min-height: 190px;
+    cursor: pointer;
+    color: #ffffff;
+    transition: 0.25s ease;
+  }
+  
+  .resource-course-card:hover {
+    transform: translateY(-5px);
+    border-color: #ff9d42;
+    background: #172640;
+  }
+  
+  .resource-course-code {
+    display: inline-block;
+    color: #ff9d42;
+    font-size: 13px;
+    font-weight: 800;
+    margin-bottom: 15px;
+  }
+  
+  .resource-course-card h2 {
+    font-size: 19px;
+    line-height: 1.4;
+    margin: 0 0 10px;
+  }
+  
+  .resource-course-card p {
+    color: #9eacc0;
+    font-size: 13px;
+    margin: 0 0 20px;
+  }
+  
+  .resource-card-link {
+    color: #ff9d42;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  
+  /* Back Button */
+  
+  .resource-back-button {
+    background: transparent;
+    border: 1px solid #34445e;
+    color: #ff9d42;
+    padding: 11px 17px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 30px;
+    transition: 0.2s ease;
+  }
+  
+  .resource-back-button:hover {
+    background: #1b2b43;
+    border-color: #ff9d42;
+  }
+  
+  /* Course Header */
+  
+  .resource-course-header {
+    background: linear-gradient(135deg, #172640, #101b2d);
+    border: 1px solid #293b56;
+    border-radius: 18px;
+    padding: 35px;
+    margin-bottom: 40px;
+  }
+  
+  .resource-course-header h1 {
+    margin-bottom: 15px;
+  }
+  
+  /* Topics Section */
+  
+  .resource-topics-section {
+    margin-bottom: 40px;
+  }
+  
+  .resource-topics-section > h2 {
+    font-size: 25px;
+    margin: 0 0 10px;
+    color: #ffffff;
+  }
+  
+  .resource-section-intro {
+    color: #aeb8c8;
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 25px;
+  }
+  
+  .resource-topics-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .resource-topic-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    background: #111d31;
+    border: 1px solid #263650;
+    border-radius: 13px;
+    padding: 23px;
+    transition: 0.2s ease;
+  }
+  
+  .resource-topic-card:hover {
+    border-color: #ff9d42;
+  }
+  
+  .resource-topic-number {
+    min-width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 157, 66, 0.12);
+    color: #ff9d42;
+    font-weight: 800;
+    border-radius: 10px;
+    font-size: 14px;
+  }
+  
+  .resource-topic-card h3 {
+    color: #ffffff;
+    font-size: 17px;
+    margin: 2px 0 10px;
+  }
+  
+  .resource-topic-card p {
+    color: #aeb8c8;
+    font-size: 14px;
+    line-height: 1.8;
+    margin: 0;
+  }
+  
+  /* PDF Section */
+  
+  .resource-pdf-section {
+    background: #111d31;
+    border: 1px solid #34445e;
+    border-radius: 15px;
+    padding: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 25px;
+  }
+  
+  .resource-pdf-section h2 {
+    font-size: 22px;
+    color: #ffffff;
+    margin: 0 0 10px;
+  }
+  
+  .resource-pdf-section p {
+    color: #aeb8c8;
+    font-size: 14px;
+    line-height: 1.7;
+    max-width: 600px;
+    margin: 0;
+  }
+  
+  .resource-pdf-button {
+    flex-shrink: 0;
+    background: #ff9d42;
+    color: #111827;
+    border: none;
+    border-radius: 9px;
+    padding: 14px 20px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+  
+  .resource-pdf-button:hover {
+    background: #ffb36d;
+    transform: translateY(-2px);
+  }
+  
+  /* Tablet */
+  
+  @media (max-width: 900px) {
+    .resources-course-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  
+    .resource-pdf-section {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+  
+  /* Mobile */
+  
+  @media (max-width: 600px) {
+    .study-resources {
+      padding: 25px 15px 45px;
+    }
+  
+    .resources-heading h1,
+    .resource-course-header h1 {
+      font-size: 28px;
+    }
+  
+    .resources-course-grid {
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+  
+    .resource-course-card {
+      min-height: auto;
+      padding: 22px;
+    }
+  
+    .resource-course-header {
+      padding: 24px 20px;
+    }
+  
+    .resource-topic-card {
+      padding: 18px;
+      gap: 13px;
+    }
+  
+    .resource-topic-number {
+      min-width: 35px;
+      height: 35px;
+      font-size: 12px;
+    }
+  
+    .resource-topic-card h3 {
+      font-size: 15px;
+    }
+  
+    .resource-topic-card p {
+      font-size: 13px;
+    }
+  
+    .resource-pdf-section {
+      padding: 22px;
+    }
+  
+    .resource-pdf-button {
+      width: 100%;
+      line-height: 1.5;
+    }
+  }

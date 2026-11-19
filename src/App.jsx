@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { supabase }from "./supabaseClient";
+import StudyResources from "./StudyResources";
 import CourseMaterial from "./CourseMaterial";
+import AIQuizGenerator from "./AIQuizGenerator";
 
 const departments = [
   "COCS",
@@ -11,7 +13,7 @@ const departments = [
 ];
 
 function App() {
-  const [page, setPage] = useState("about");
+  const [page, setPage] = useState("loading");
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -24,38 +26,58 @@ function App() {
   const [authError, setAuthError] = useState("");
   const [authMessage, setAuthMessage] = useState("");
 
-  // Check the user's login session
-  useEffect(() => {
-    let mounted = true;
+  // Check login session without blocking the website indefinitely
+useEffect(() => {
+  let mounted = true;
 
-    const getInitialSession = async () => {
+  // Allow public pages to load even if Supabase is slow
+  const timeoutId = setTimeout(() => {
+    if (mounted) {
+      setAuthLoading(false);
+    }
+  }, 8000);
+
+  const getInitialSession = async () => {
+    try {
       const { data, error } = await supabase.auth.getSession();
 
       if (!mounted) return;
 
       if (error) {
-        setAuthError(error.message);
+        console.error("Session error:", error.message);
+      } else {
+        const currentUser = data?.session?.user ?? null;
+
+        setUser(currentUser);
+        setPage(currentUser ? "dashboard" : "about");
       }
-
-      setUser(data?.session?.user ?? null);
-      setAuthLoading(false);
-    };
-
-    getInitialSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } catch (error) {
+      console.error("Unable to check login session:", error);
+    } finally {
       if (mounted) {
-        setUser(session?.user ?? null);
+        setAuthLoading(false);
       }
-    });
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+      clearTimeout(timeoutId);
+    }
+  };
+
+  getInitialSession();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (mounted) {
+      setUser(session?.user ?? null);
+    }
+  });
+
+  return () => {
+    mounted = false;
+    clearTimeout(timeoutId);
+    subscription.unsubscribe();
+  };
+}, []);
 
   // Navigation
   const openPage = (selectedPage) => {
@@ -169,30 +191,63 @@ function App() {
       content: (
         <>
           <p>
-            Bowen Study Hub is an independent learning platform created to
-            help students organise their academic resources and make studying
-            easier.
+            Bowen Study Hub is an independent educational platform created
+            to help students organise their academic resources, access
+            learning materials and develop better study habits.
           </p>
-
+    
+          <h3>Our Story</h3>
+          <p>
+            Finding, organising and revising academic materials can be
+            challenging for university students. Bowen Study Hub was
+            created to make that process easier by bringing useful
+            educational resources and study tools together in one place.
+          </p>
+    
           <h3>Our Mission</h3>
           <p>
-            Our mission is to make academic resources easier to find, organise
-            and use. We aim to support students with accessible learning
-            materials and useful study tools.
+            Our mission is to make academic learning resources easier to
+            discover and access while supporting students in their
+            educational journey.
           </p>
-
+    
+          <h3>Who We Serve</h3>
+          <p>
+            The platform is designed primarily for Bowen University
+            students, particularly students in computing-related
+            disciplines. Other learners interested in the available
+            educational resources may also find the platform useful.
+          </p>
+    
           <h3>What We Offer</h3>
           <ul>
-            <li>Organised course materials.</li>
-            <li>Access to educational PDF resources.</li>
-            <li>Study tools and learning support.</li>
-            <li>A platform for students to support one another academically.</li>
+            <li>Organised course materials and educational PDFs.</li>
+            <li>Academic resources covering introductory subjects.</li>
+            <li>AI-assisted practice quizzes, when available.</li>
+            <li>Study support tools designed to encourage active learning.</li>
+            <li>A convenient place to discover and organise learning resources.</li>
           </ul>
-
+    
+          <h3>Our Approach to Learning</h3>
           <p>
-            Bowen Study Hub is an independent student project. It is not an
-            official website of Bowen University and is not affiliated with
-            or endorsed by the University.
+            We believe effective learning involves more than simply
+            reading notes. Students benefit from regular revision,
+            practising questions, understanding difficult concepts
+            and developing consistent study habits.
+          </p>
+    
+          <h3>Our Commitment</h3>
+          <p>
+            We aim to provide an organised and accessible learning
+            experience. We also encourage users to verify academic
+            information with their lecturers and official course materials.
+          </p>
+    
+          <h3>Independent Educational Project</h3>
+          <p>
+            Bowen Study Hub is an independent student project. It is
+            not an official website of Bowen University and is not
+            affiliated with, endorsed by or operated by the University.
           </p>
         </>
       ),
@@ -775,12 +830,22 @@ function App() {
               <button onClick={() => openPage("materials")}>
                 Course Materials
               </button>
+              <button onClick={() => openPage("quiz")}>AI Quiz Generator</button>
               <button onClick={() => openPage("about")}>About</button>
+              <button onClick={() => openPage("resources")}>
+                Study Resources
+              </button>
+              <button onClick={() => openPage("privacy")}>Privacy</button>
+              <button onClick={() => openPage("terms")}>Terms</button>
+              <button onClick={() => openPage("contact")}>Contact</button>
               <button onClick={handleLogout}>Log out</button>
             </>
           ) : (
             <>
               <button onClick={() => openPage("about")}>About</button>
+              <button onClick={() => openPage("resources")}>
+  Study Resources
+</button>
               <button onClick={() => openPage("privacy")}>Privacy</button>
               <button onClick={() => openPage("terms")}>Terms</button>
               <button onClick={() => openPage("contact")}>Contact</button>
@@ -883,12 +948,22 @@ function App() {
         </main>
       )}
 
-      {/* PUBLIC INFORMATION PAGES */}
-      {!user && isPublicPage && page !== "about" && (
+      {/* PUBLIC INFORMATION PAGES - AVAILABLE TO EVERYONE */}
+      {isPublicPage && page !== "about" && (
         <main className="content-area">
           <article className="public-page">
             <h1>{publicPages[page].title}</h1>
             {publicPages[page].content}
+          </article>
+        </main>
+      )}
+
+      {/* ABOUT PAGE FOR LOGGED-IN STUDENTS */}
+      {user && page === "about" && (
+        <main className="content-area">
+          <article className="public-page">
+            <h1>{publicPages.about.title}</h1>
+            {publicPages.about.content}
           </article>
         </main>
       )}
@@ -1044,6 +1119,13 @@ function App() {
 
               <button
                 className="secondary-button"
+                onClick={() => openPage("quiz")}
+              >
+                🧠 AI Quiz Generator
+              </button>
+
+              <button
+                className="secondary-button"
                 onClick={() => openPage("about")}
               >
                 About the platform
@@ -1070,7 +1152,24 @@ function App() {
             </button>
           </div>
 
-          <CourseMaterial />
+          <CourseMaterial user={user} />
+        </main>
+      )}
+
+      {/* PROTECTED AI QUIZ GENERATOR */}
+      {user && page === "quiz" && (
+        <main className="dashboard">
+          <div className="dashboard-header">
+            <h1>AI Quiz Generator</h1>
+            <p>Generate practice questions from your course materials.</p>
+            <button
+              className="secondary-button"
+              onClick={() => openPage("dashboard")}
+            >
+              ← Back to Dashboard
+            </button>
+          </div>
+          <AIQuizGenerator />
         </main>
       )}
 
